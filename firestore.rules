@@ -1,0 +1,190 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: uid
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - role: string (required, enum: ['admin', 'bendahara', 'cabang'])
+    //   - displayName: string (optional)
+    //   - cabangId: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: cabang
+    // Document ID: auto-generated
+    // Fields:
+    //   - namaCabang: string (required)
+    //   - alamat: string (required)
+    //   - namaKepala: string (required)
+    //   - noHp: string (required)
+    //   - email: string (required)
+    //   - status: string (required, enum: ['pending', 'aktif', 'rejected'])
+    //   - noRegistrasi: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: peserta
+    // Document ID: auto-generated
+    // Fields:
+    //   - nama: string (required)
+    //   - cabangId: string (required, 'pusat' or cabangId)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: transaksi
+    // Document ID: auto-generated
+    // Fields:
+    //   - cabangId: string (required)
+    //   - nominal: number (required)
+    //   - porsiPusat: number (required)
+    //   - porsiCabang: number (required)
+    //   - tipe: string (required)
+    //   - status: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: pengaturan
+    // Document ID: global
+    // Fields:
+    //   - biayaPendaftaranCabang: number
+    //   - persentasePusat: number
+    //   - persentaseCabang: number
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          request.auth.token.email == "risamari721@gmail.com" ||
+          request.auth.token.email == "admin@caem.com"
+        );
+    }
+
+    function isBendahara() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'bendahara';
+    }
+
+    function isCabang() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'cabang';
+    }
+
+    function isCabangOwner(cabangId) {
+      return isCabang() && getUserData().cabangId == cabangId;
+    }
+
+    function isAktifCabang(cabangId) {
+      return isCabangOwner(cabangId) && getUserData().status == 'aktif';
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.uid is string &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'bendahara', 'cabang'] &&
+             (data.createdAt is timestamp || data.createdAt == null) &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('cabangId' in data) || data.cabangId is string);
+    }
+
+    function isValidCabang(data) {
+      return data.namaCabang is string && data.namaCabang.size() > 0 && data.namaCabang.size() < 100 &&
+             data.alamat is string && data.alamat.size() > 0 && data.alamat.size() < 500 &&
+             data.namaKepala is string && data.namaKepala.size() > 0 && data.namaKepala.size() < 100 &&
+             data.noHp is string && data.noHp.size() > 0 && data.noHp.size() < 20 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.status in ['pending', 'aktif', 'rejected'] &&
+             (data.createdAt is timestamp || data.createdAt == null) &&
+             (!('ktpUrl' in data) || data.ktpUrl is string) &&
+             (!('fotoUrl' in data) || data.fotoUrl is string) &&
+             (!('buktiBayarUrl' in data) || data.buktiBayarUrl is string) &&
+             (!('nominalPendaftaran' in data) || data.nominalPendaftaran is number) &&
+             (!('statusPembayaran' in data) || data.statusPembayaran is string);
+    }
+
+    function isValidPeserta(data) {
+      return data.nama is string && data.nama.size() > 0 && data.nama.size() < 100 &&
+             data.cabangId is string &&
+             data.createdAt is timestamp &&
+             (!('nominalPendaftaran' in data) || data.nominalPendaftaran is number) &&
+             (!('statusPembayaran' in data) || data.statusPembayaran is string) &&
+             (!('status' in data) || data.status is string);
+    }
+
+    function isValidTransaksi(data) {
+      return data.cabangId is string &&
+             data.nominal is number &&
+             data.porsiPusat is number &&
+             data.porsiCabang is number &&
+             data.tipe is string &&
+             data.status is string &&
+             data.createdAt is timestamp &&
+             (!('keterangan' in data) || data.keterangan is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin() || isBendahara();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(uid) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(uid) || isAdmin());
+    }
+
+    match /cabang/{cabangId} {
+      allow read: if isAdmin() || isBendahara() || isCabangOwner(cabangId) || resource.data.status == 'aktif';
+      allow create: if isAuthenticated() && isValidCabang(request.resource.data); // Anyone can register a branch
+      allow update: if isAdmin() || isBendahara() || (isCabangOwner(cabangId) && request.resource.data.status == resource.data.status);
+    }
+
+    match /peserta/{pesertaId} {
+      allow read: if isAdmin() || isBendahara() || isAktifCabang(resource.data.cabangId);
+      allow create: if true; // Public registration allowed
+      allow update: if isAdmin() || isBendahara() || (isAktifCabang(resource.data.cabangId) && request.resource.data.cabangId == resource.data.cabangId);
+    }
+
+    match /transaksi/{transaksiId} {
+      allow read: if isAdmin() || isBendahara() || isAktifCabang(resource.data.cabangId);
+      allow create: if isAdmin() || isBendahara() || (isAktifCabang(request.resource.data.cabangId));
+      allow update: if isAdmin() || isBendahara();
+    }
+
+    match /pengaturan/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

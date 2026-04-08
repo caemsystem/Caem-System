@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile for authentication and role-based access control.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "bendahara", "cabang"] },
+        "displayName": { "type": "string" },
+        "cabangId": { "type": "string", "description": "Reference to Cabang entity if role is 'cabang'" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Cabang": {
+      "title": "Cabang",
+      "description": "Branch office information.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namaCabang": { "type": "string", "description": "Based on Kecamatan" },
+        "alamat": { "type": "string" },
+        "namaKepala": { "type": "string" },
+        "noHp": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "ktpUrl": { "type": "string", "format": "uri" },
+        "fotoUrl": { "type": "string", "format": "uri" },
+        "buktiBayarUrl": { "type": "string", "format": "uri" },
+        "status": { "type": "string", "enum": ["pending", "aktif", "rejected"] },
+        "noRegistrasi": { "type": "string", "description": "Generated upon approval (CAEM-YYYY-XXX)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "approvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["namaCabang", "alamat", "namaKepala", "noHp", "email", "status"]
+    },
+    "Peserta": {
+      "title": "Peserta",
+      "description": "Student information.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nama": { "type": "string" },
+        "dataDiri": { "type": "object" },
+        "cabangId": { "type": "string", "description": "Reference to Cabang or 'pusat'" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["nama", "cabangId"]
+    },
+    "Transaksi": {
+      "title": "Transaksi",
+      "description": "Financial transactions for revenue sharing and payments.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pesertaId": { "type": "string" },
+        "cabangId": { "type": "string" },
+        "nominal": { "type": "number" },
+        "porsiPusat": { "type": "number" },
+        "porsiCabang": { "type": "number" },
+        "tipe": { "type": "string", "enum": ["pendaftaran_peserta", "biaya_bulanan"] },
+        "status": { "type": "string", "enum": ["paid", "pending"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cabangId", "nominal", "createdAt"]
+    },
+    "Pengaturan": {
+      "title": "Pengaturan",
+      "description": "Global system settings.",
+      "type": "object",
+      "properties": {
+        "biayaPendaftaranCabang": { "type": "number" },
+        "persentasePusat": { "type": "number", "description": "Percentage for central office (0-100)" },
+        "persentaseCabang": { "type": "number", "description": "Percentage for branch office (0-100)" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles" },
+    "/cabang/{cabangId}": { "schema": "Cabang", "description": "Branch offices" },
+    "/peserta/{pesertaId}": { "schema": "Peserta", "description": "Students" },
+    "/transaksi/{transaksiId}": { "schema": "Transaksi", "description": "Transactions" },
+    "/pengaturan/global": { "schema": "Pengaturan", "description": "Global settings" }
+  }
+}

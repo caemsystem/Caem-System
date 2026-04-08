@@ -34,7 +34,7 @@ export default function PesertaPage({ user }: PesertaPageProps) {
     alamat: '',
     noHp: '',
     email: '',
-    cabangId: user.role === 'cabang' ? user.cabangId : 'pusat',
+    cabangId: user.role === 'cabang' ? (user.cabangId || '') : 'pusat',
   });
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function PesertaPage({ user }: PesertaPageProps) {
       });
 
       setIsModalOpen(false);
-      setFormData({ nama: '', alamat: '', noHp: '', email: '', cabangId: user.role === 'cabang' ? user.cabangId : 'pusat' });
+      setFormData({ nama: '', alamat: '', noHp: '', email: '', cabangId: user.role === 'cabang' ? (user.cabangId || '') : 'pusat' });
       fetchData();
     } catch (error) {
       console.error('Error adding peserta:', error);

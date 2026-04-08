@@ -27,8 +27,10 @@ export default function RegisterPeserta() {
     cabangId: '',
   });
   const [cabangList, setCabangList] = useState<Cabang[]>([]);
+  const [nominalPendaftaran, setNominalPendaftaran] = useState(150000);
   const [loading, setLoading] = useState(false);
   const [fetchingCabang, setFetchingCabang] = useState(true);
+  const [fetchingSettings, setFetchingSettings] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -56,7 +58,23 @@ export default function RegisterPeserta() {
         setFetchingCabang(false);
       }
     };
+
+    const fetchSettings = async () => {
+      try {
+        const settingsSnap = await getDocs(collection(db, 'pengaturan'));
+        if (!settingsSnap.empty) {
+          const settings = settingsSnap.docs[0].data() as Pengaturan;
+          setNominalPendaftaran(settings.biayaPendaftaranPeserta || 150000);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch settings, using default:', err);
+      } finally {
+        setFetchingSettings(false);
+      }
+    };
+
     fetchCabang();
+    fetchSettings();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,14 +85,6 @@ export default function RegisterPeserta() {
 
     try {
       try {
-        // Fetch settings for registration fee
-        const settingsSnap = await getDocs(collection(db, 'pengaturan'));
-        let nominalPendaftaran = 150000; // Default
-        if (!settingsSnap.empty) {
-          const settings = settingsSnap.docs[0].data() as Pengaturan;
-          nominalPendaftaran = settings.biayaPendaftaranPeserta;
-        }
-
         await addDoc(collection(db, 'peserta'), {
           nama: formData.nama,
           dataDiri: {
@@ -88,7 +98,11 @@ export default function RegisterPeserta() {
           statusPembayaran: 'belum_lunas',
           createdAt: serverTimestamp(),
         });
+      } catch (err) {
+        return handleFirestoreError(err, OperationType.CREATE, 'peserta');
+      }
 
+      try {
         // Also create a transaction record
         await addDoc(collection(db, 'transaksi'), {
           cabangId: formData.cabangId,
@@ -100,7 +114,7 @@ export default function RegisterPeserta() {
           createdAt: serverTimestamp(),
         });
       } catch (err) {
-        return handleFirestoreError(err, OperationType.CREATE, 'peserta');
+        return handleFirestoreError(err, OperationType.CREATE, 'transaksi');
       }
       setSuccess(true);
     } catch (err: any) {
@@ -220,6 +234,16 @@ export default function RegisterPeserta() {
                   </select>
                 </div>
                 {fetchingCabang && <p className="text-xs text-gray-400 mt-1">Memuat daftar cabang...</p>}
+              </div>
+
+              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-purple-700">Biaya Pendaftaran (100% Lunas)</span>
+                  <span className="text-lg font-bold text-purple-900">
+                    {fetchingSettings ? '...' : `Rp ${nominalPendaftaran.toLocaleString('id-ID')}`}
+                  </span>
+                </div>
+                <p className="text-xs text-purple-600 mt-1 italic">* Pembayaran dilakukan setelah pendaftaran dikonfirmasi oleh admin cabang.</p>
               </div>
             </div>
 

@@ -140,7 +140,7 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
     try {
       const settingsDoc = await getDoc(doc(db, path));
       if (settingsDoc.exists()) {
-        setSettings(settingsDoc.data() as Pengaturan);
+        setSettings(prev => ({ ...prev, ...settingsDoc.data() }));
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);

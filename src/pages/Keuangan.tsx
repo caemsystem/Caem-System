@@ -52,7 +52,7 @@ export default function KeuanganPage({ user }: KeuanganPageProps) {
       // 2. Fetch Settings
       const settingsDoc = await getDoc(doc(db, 'pengaturan/global'));
       if (settingsDoc.exists()) {
-        setSettings(settingsDoc.data() as Pengaturan);
+        setSettings(prev => ({ ...prev, ...settingsDoc.data() }));
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'keuangan_data');
@@ -88,7 +88,7 @@ export default function KeuanganPage({ user }: KeuanganPageProps) {
     tipe: 'pemasukan' as 'pemasukan' | 'pengeluaran',
     keterangan: '',
     nominal: 0,
-    cabangId: user.role === 'cabang' ? user.cabangId : 'pusat',
+    cabangId: user.role === 'cabang' ? (user.cabangId || '') : 'pusat',
   });
 
   const handleAddTransaction = async (e: React.FormEvent) => {
@@ -120,7 +120,7 @@ export default function KeuanganPage({ user }: KeuanganPageProps) {
         tipe: 'pemasukan',
         keterangan: '',
         nominal: 0,
-        cabangId: user.role === 'cabang' ? user.cabangId : 'pusat',
+        cabangId: user.role === 'cabang' ? (user.cabangId || '') : 'pusat',
       });
       fetchData();
       alert('Transaksi berhasil dicatat!');
@@ -443,7 +443,7 @@ export default function KeuanganPage({ user }: KeuanganPageProps) {
                       min="0"
                       className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                       placeholder="0"
-                      value={formData.nominal || ''}
+                      value={formData.nominal}
                       onChange={e => setFormData({ ...formData, nominal: Number(e.target.value) })}
                     />
                   </div>

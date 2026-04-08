@@ -23,6 +23,8 @@ export interface Cabang {
   status: 'pending' | 'aktif' | 'rejected';
   noRegistrasi?: string;
   nominalPendaftaran?: number;
+  nominalDibayar?: number;
+  metodePembayaran?: 'lunas' | 'cicil';
   statusPembayaran?: 'lunas' | 'belum_lunas';
   createdAt: string;
   approvedAt?: string;

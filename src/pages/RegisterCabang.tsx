@@ -37,13 +37,17 @@ export default function RegisterCabang() {
     noHp: '',
     email: '',
     password: '',
+    metodePembayaran: 'lunas' as 'lunas' | 'cicil',
+    nominalBayar: 0,
   });
   const [files, setFiles] = useState<{ [key: string]: File | null }>({
     ktp: null,
     foto: null,
     buktiBayar: null,
   });
+  const [nominalPendaftaran, setNominalPendaftaran] = useState(5000000);
   const [loading, setLoading] = useState(false);
+  const [fetchingSettings, setFetchingSettings] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -63,6 +67,26 @@ export default function RegisterCabang() {
     console.error('Firestore Error:', JSON.stringify(errInfo));
     throw new Error(err.message || 'Terjadi kesalahan saat pendaftaran.');
   };
+
+  React.useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const regDb = getRegDb();
+        const settingsSnap = await getDocs(collection(regDb, 'pengaturan'));
+        if (!settingsSnap.empty) {
+          const settings = settingsSnap.docs[0].data() as Pengaturan;
+          const fee = settings.biayaPendaftaranCabang || 5000000;
+          setNominalPendaftaran(fee);
+          setFormData(prev => ({ ...prev, nominalBayar: fee }));
+        }
+      } catch (err) {
+        console.warn('Failed to fetch settings, using default:', err);
+      } finally {
+        setFetchingSettings(false);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
     if (e.target.files && e.target.files[0]) {
@@ -121,6 +145,17 @@ export default function RegisterCabang() {
     if (!files.ktp || !files.foto || !files.buktiBayar) {
       return setError('Silakan upload semua dokumen yang diperlukan.');
     }
+    if (formData.metodePembayaran === 'cicil') {
+      const minDP = nominalPendaftaran * 0.5;
+      if (formData.nominalBayar < minDP) {
+        return setError(`Minimal DP adalah 50% dari total biaya (Rp ${minDP.toLocaleString('id-ID')})`);
+      }
+    } else {
+      if (formData.nominalBayar < nominalPendaftaran) {
+        return setError(`Untuk metode Lunas, nominal bayar harus Rp ${nominalPendaftaran.toLocaleString('id-ID')}`);
+      }
+    }
+
     setLoading(true);
     setError('');
 
@@ -164,14 +199,6 @@ export default function RegisterCabang() {
       // 3. Create Cabang Document
       let cabangRef;
       try {
-        // Fetch settings for registration fee
-        const settingsSnap = await getDocs(collection(regDb, 'pengaturan'));
-        let nominalPendaftaran = 5000000; // Default
-        if (!settingsSnap.empty) {
-          const settings = settingsSnap.docs[0].data() as Pengaturan;
-          nominalPendaftaran = settings.biayaPendaftaranCabang;
-        }
-
         cabangRef = await addDoc(collection(regDb, 'cabang'), {
           namaCabang: formData.namaCabang,
           alamat: formData.alamat,
@@ -183,22 +210,29 @@ export default function RegisterCabang() {
           buktiBayarUrl, 
           status: 'pending',
           nominalPendaftaran,
-          statusPembayaran: 'belum_lunas', // Initially unpaid until verified by admin
-          createdAt: serverTimestamp(),
-        });
-
-        // Also create a transaction record
-        await addDoc(collection(regDb, 'transaksi'), {
-          cabangId: cabangRef.id,
-          nominal: nominalPendaftaran,
-          porsiPusat: nominalPendaftaran, // For branch registration, all goes to central
-          porsiCabang: 0,
-          tipe: 'pendaftaran_cabang',
-          status: 'pending',
+          nominalDibayar: formData.nominalBayar,
+          metodePembayaran: formData.metodePembayaran,
+          statusPembayaran: formData.nominalBayar >= nominalPendaftaran ? 'lunas' : 'belum_lunas',
           createdAt: serverTimestamp(),
         });
       } catch (err) {
         return handleFirestoreError(err, OperationType.CREATE, 'cabang');
+      }
+
+      try {
+        // Also create a transaction record
+        await addDoc(collection(regDb, 'transaksi'), {
+          cabangId: cabangRef.id,
+          nominal: formData.nominalBayar,
+          porsiPusat: formData.nominalBayar, // For branch registration, all goes to central
+          porsiCabang: 0,
+          tipe: 'pendaftaran_cabang',
+          status: 'pending',
+          keterangan: formData.metodePembayaran === 'cicil' ? 'Pembayaran DP 50%' : 'Pembayaran Lunas',
+          createdAt: serverTimestamp(),
+        });
+      } catch (err) {
+        return handleFirestoreError(err, OperationType.CREATE, 'transaksi');
       }
 
       // 4. Create User Document
@@ -360,6 +394,74 @@ export default function RegisterCabang() {
                     value={formData.password}
                     onChange={e => setFormData({ ...formData, password: e.target.value })}
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-600 pl-3">Metode Pembayaran</h3>
+              <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 space-y-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-700">Total Biaya Pendaftaran</span>
+                  <span className="text-xl font-bold text-blue-900">
+                    {fetchingSettings ? '...' : `Rp ${nominalPendaftaran.toLocaleString('id-ID')}`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, metodePembayaran: 'lunas', nominalBayar: nominalPendaftaran })}
+                    className={cn(
+                      "p-4 rounded-2xl border-2 transition-all text-left",
+                      formData.metodePembayaran === 'lunas'
+                        ? "border-blue-600 bg-white shadow-md"
+                        : "border-gray-200 bg-gray-50/50 hover:border-blue-300"
+                    )}
+                  >
+                    <div className="font-bold text-gray-900">Lunas</div>
+                    <div className="text-xs text-gray-500">Bayar 100% langsung</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, metodePembayaran: 'cicil', nominalBayar: nominalPendaftaran * 0.5 })}
+                    className={cn(
+                      "p-4 rounded-2xl border-2 transition-all text-left",
+                      formData.metodePembayaran === 'cicil'
+                        ? "border-blue-600 bg-white shadow-md"
+                        : "border-gray-200 bg-gray-50/50 hover:border-blue-300"
+                    )}
+                  >
+                    <div className="font-bold text-gray-900">Cicil (DP)</div>
+                    <div className="text-xs text-gray-500">Minimal DP 50%</div>
+                  </button>
+                </div>
+
+                {formData.metodePembayaran === 'cicil' && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-2"
+                  >
+                    <label className="block text-sm font-semibold text-gray-700">Nominal DP yang Dibayar (Rp)</label>
+                    <input
+                      type="number"
+                      required
+                      min={nominalPendaftaran * 0.5}
+                      max={nominalPendaftaran}
+                      className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-900"
+                      value={formData.nominalBayar}
+                      onChange={e => setFormData({ ...formData, nominalBayar: Number(e.target.value) })}
+                    />
+                    <p className="text-[10px] text-blue-500 italic">* Minimal DP: Rp {(nominalPendaftaran * 0.5).toLocaleString('id-ID')}</p>
+                  </motion.div>
+                )}
+
+                <div className="pt-4 border-t border-blue-200 flex justify-between items-center">
+                  <span className="text-sm font-bold text-gray-700">Nominal yang Akan Dibayar</span>
+                  <span className="text-lg font-black text-blue-600">
+                    Rp {formData.nominalBayar.toLocaleString('id-ID')}
+                  </span>
                 </div>
               </div>
             </div>

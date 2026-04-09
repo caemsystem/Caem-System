@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, getDocs, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Transaksi, Cabang } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
+import { handleFirestoreError, OperationType, formatDate, toISODate } from '../lib/firestore-utils';
 import { 
   FileText, 
   Download, 
@@ -57,7 +57,7 @@ export default function LaporanPage({ user }: LaporanPageProps) {
   };
 
   const filteredTransactions = transactions.filter(tx => {
-    const txDate = new Date(tx.createdAt).toISOString().split('T')[0];
+    const txDate = toISODate(tx.createdAt);
     const matchesStart = !dateRange.start || txDate >= dateRange.start;
     const matchesEnd = !dateRange.end || txDate <= dateRange.end;
     const matchesCabang = filterCabang === 'all' || tx.cabangId === filterCabang;
@@ -83,7 +83,7 @@ export default function LaporanPage({ user }: LaporanPageProps) {
     doc.text(`Periode: ${dateRange.start || 'Semua'} s/d ${dateRange.end || 'Semua'}`, 14, 22);
     
     const tableData = filteredTransactions.map(tx => [
-      new Date(tx.createdAt).toLocaleDateString('id-ID'),
+      formatDate(tx.createdAt),
       tx.tipe.replace('_', ' '),
       tx.cabangId === 'pusat' ? 'Pusat' : (cabangList.find(c => c.id === tx.cabangId)?.namaCabang || 'Cabang'),
       formatCurrency(tx.nominal),
@@ -102,7 +102,7 @@ export default function LaporanPage({ user }: LaporanPageProps) {
 
   const exportToExcel = () => {
     const data = filteredTransactions.map(tx => ({
-      Tanggal: new Date(tx.createdAt).toLocaleDateString('id-ID'),
+      Tanggal: formatDate(tx.createdAt),
       Tipe: tx.tipe.replace('_', ' '),
       Cabang: tx.cabangId === 'pusat' ? 'Pusat' : (cabangList.find(c => c.id === tx.cabangId)?.namaCabang || 'Cabang'),
       Total: tx.nominal,
@@ -241,7 +241,7 @@ export default function LaporanPage({ user }: LaporanPageProps) {
                 filteredTransactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(tx.createdAt).toLocaleDateString('id-ID')}
+                      {formatDate(tx.createdAt)}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm font-bold text-gray-900 capitalize">{tx.tipe.replace('_', ' ')}</p>
@@ -276,7 +276,7 @@ export default function LaporanPage({ user }: LaporanPageProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-bold text-gray-900 capitalize">{tx.tipe.replace('_', ' ')}</p>
-                    <p className="text-[10px] text-gray-500">{new Date(tx.createdAt).toLocaleDateString('id-ID')}</p>
+                    <p className="text-[10px] text-gray-500">{formatDate(tx.createdAt)}</p>
                   </div>
                   <span className="text-xs font-bold text-gray-900">{formatCurrency(tx.nominal)}</span>
                 </div>

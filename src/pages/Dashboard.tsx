@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { collection, query, getDocs, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
-import { UserProfile, Cabang, Peserta, Transaksi, Pengaturan } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
+import { UserProfile, Cabang, Peserta, Transaksi, Pengaturan, Tagihan } from '../types';
+import { handleFirestoreError, OperationType, formatDate, toDate } from '../lib/firestore-utils';
 import { 
   Users, 
   Building2, 
@@ -10,7 +10,8 @@ import {
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -41,6 +42,7 @@ export default function Dashboard({ user }: DashboardProps) {
   const [loading, setLoading] = useState(true);
 
   const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
+  const [pendingBills, setPendingBills] = useState<Tagihan[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,13 +98,12 @@ export default function Dashboard({ user }: DashboardProps) {
             const amount = user.role === 'admin' || user.role === 'bendahara' ? (data.porsiPusat || 0) : (user.role === 'cabang' ? (data.porsiCabang || 0) : (data.nominal || 0));
             totalPemasukan += amount;
 
-            const txDate = new Date(data.createdAt);
-            if (txDate >= firstDayOfMonth) {
+            const txDate = toDate(data.createdAt);
+            if (txDate && txDate >= firstDayOfMonth) {
               pemasukanBulanIni += amount;
+              const monthKey = txDate.toLocaleString('default', { month: 'short' });
+              monthlyData[monthKey] = (monthlyData[monthKey] || 0) + amount;
             }
-
-            const monthKey = txDate.toLocaleString('default', { month: 'short' });
-            monthlyData[monthKey] = (monthlyData[monthKey] || 0) + amount;
           }
         });
 
@@ -114,6 +115,16 @@ export default function Dashboard({ user }: DashboardProps) {
         });
 
         setRecentTransactions(transactions.slice(0, 5));
+
+        // 2. Fetch Pending Bills for Cabang
+        if (user.role === 'cabang') {
+          const billSnap = await getDocs(query(
+            collection(db, 'tagihan'), 
+            where('cabangId', '==', user.cabangId),
+            where('status', '==', 'pending')
+          ));
+          setPendingBills(billSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Tagihan)));
+        }
 
         // Format chart data
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -196,10 +207,38 @@ export default function Dashboard({ user }: DashboardProps) {
         <div className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-2xl shadow-sm w-fit">
           <Clock size={16} className="text-blue-600" />
           <span className="text-xs sm:text-sm font-medium text-gray-700">
-            {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {formatDate(new Date(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </span>
         </div>
       </div>
+
+      {/* Pending Bills Notice for Cabang */}
+      {user.role === 'cabang' && pendingBills.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 border border-red-100 rounded-3xl p-6 sm:p-8 mb-6"
+        >
+          <div className="flex flex-col sm:flex-row items-start gap-6">
+            <div className="p-4 bg-red-100 text-red-600 rounded-2xl shrink-0">
+              <AlertCircle size={32} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-red-900 mb-2">Tagihan Menunggu Pembayaran</h3>
+              <p className="text-red-800 text-sm mb-4 leading-relaxed">
+                Anda memiliki {pendingBills.length} tagihan dari pusat yang belum dibayar. Silakan segera lakukan pembayaran untuk kelancaran operasional.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                {pendingBills.map(bill => (
+                  <div key={bill.id} className="bg-white/50 px-4 py-2 rounded-xl border border-red-200 text-sm font-bold text-red-900">
+                    {formatCurrency(bill.nominal)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Pending Branch Notice */}
       {user.role === 'cabang' && user.status !== 'aktif' && (
@@ -340,7 +379,7 @@ export default function Dashboard({ user }: DashboardProps) {
                           {tx.tipe === 'pendaftaran_peserta' ? 'Pendaftaran Peserta' : 'Biaya Bulanan'}
                         </p>
                         <p className="text-[10px] sm:text-xs text-gray-500">
-                          {new Date(tx.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                          {formatDate(tx.createdAt, { day: 'numeric', month: 'short' })}
                         </p>
                       </div>
                       <div className="text-right shrink-0">

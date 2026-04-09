@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate, Link } from 'react-router-dom';
-import { GraduationCap, CheckCircle2, AlertCircle, ArrowLeft, Building2, User, Phone } from 'lucide-react';
+import { GraduationCap, CheckCircle2, AlertCircle, ArrowLeft, Building2, User, Phone, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Pengaturan } from '../types';
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
+}
 
 interface Cabang {
   id: string;
@@ -26,7 +30,9 @@ export default function RegisterPeserta() {
     noHp: '',
     cabangId: '',
   });
+  const [buktiBayar, setBuktiBayar] = useState<File | null>(null);
   const [cabangList, setCabangList] = useState<Cabang[]>([]);
+  const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
   const [nominalPendaftaran, setNominalPendaftaran] = useState(150000);
   const [loading, setLoading] = useState(false);
   const [fetchingCabang, setFetchingCabang] = useState(true);
@@ -64,6 +70,7 @@ export default function RegisterPeserta() {
         const settingsSnap = await getDocs(collection(db, 'pengaturan'));
         if (!settingsSnap.empty) {
           const settings = settingsSnap.docs[0].data() as Pengaturan;
+          setPengaturan(settings);
           setNominalPendaftaran(settings.biayaPendaftaranPeserta || 150000);
         }
       } catch (err) {
@@ -77,15 +84,66 @@ export default function RegisterPeserta() {
     fetchSettings();
   }, []);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 500 * 1024) {
+        return alert('Ukuran file terlalu besar. Maksimal 500KB.');
+      }
+      setBuktiBayar(file);
+    }
+  };
+
+  const compressImage = (file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.6): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height *= maxWidth / width;
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width *= maxHeight / height;
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Failed to get canvas context'));
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.cabangId) return setError('Silakan pilih lembaga bimbel.');
+    if (!buktiBayar) return setError('Silakan upload bukti pembayaran.');
     setLoading(true);
     setError('');
 
     try {
+      const buktiBayarUrl = await compressImage(buktiBayar);
+
       try {
-        await addDoc(collection(db, 'peserta'), {
+        const pesertaRef = await addDoc(collection(db, 'peserta'), {
           nama: formData.nama,
           dataDiri: {
             noHp: formData.noHp,
@@ -95,26 +153,29 @@ export default function RegisterPeserta() {
           cabangId: formData.cabangId,
           status: 'pending',
           nominalPendaftaran,
+          buktiBayarUrl,
           statusPembayaran: 'belum_lunas',
           createdAt: serverTimestamp(),
         });
-      } catch (err) {
-        return handleFirestoreError(err, OperationType.CREATE, 'peserta');
-      }
 
-      try {
         // Also create a transaction record
+        const isPusat = formData.cabangId === 'pusat';
+        const porsiPusat = isPusat ? nominalPendaftaran : (nominalPendaftaran * (pengaturan?.persentasePusat || 30) / 100);
+        const porsiCabang = isPusat ? 0 : (nominalPendaftaran * (pengaturan?.persentaseCabang || 70) / 100);
+
         await addDoc(collection(db, 'transaksi'), {
+          pesertaId: pesertaRef.id,
           cabangId: formData.cabangId,
           nominal: nominalPendaftaran,
-          porsiPusat: 0, // Will be calculated upon payment confirmation
-          porsiCabang: 0,
+          porsiPusat,
+          porsiCabang,
           tipe: 'pendaftaran_peserta',
           status: 'pending',
+          keterangan: 'Pendaftaran Peserta Baru (Bukti Bayar Terlampir)',
           createdAt: serverTimestamp(),
         });
       } catch (err) {
-        return handleFirestoreError(err, OperationType.CREATE, 'transaksi');
+        return handleFirestoreError(err, OperationType.CREATE, 'peserta_or_transaksi');
       }
       setSuccess(true);
     } catch (err: any) {
@@ -138,7 +199,7 @@ export default function RegisterPeserta() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Pendaftaran Berhasil!</h2>
           <p className="text-gray-600 mb-8">
-            Data Anda telah berhasil didaftarkan. Silakan hubungi admin cabang terkait untuk informasi lebih lanjut mengenai jadwal belajar.
+            Data Anda telah berhasil didaftarkan dan status Anda kini telah **Aktif**. Silakan hubungi admin cabang terkait untuk informasi lebih lanjut mengenai jadwal belajar.
           </p>
           <Link 
             to="/register" 
@@ -166,8 +227,13 @@ export default function RegisterPeserta() {
         >
           <div className="bg-purple-600 p-8 text-white">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-white/20 rounded-2xl">
-                <GraduationCap size={32} />
+              <div className="p-2 bg-white rounded-2xl">
+                <img 
+                  src="https://lh3.googleusercontent.com/d/1W2PxoxVqazsPJY9Ej3DawsZZLqs0lBZc?t=1" 
+                  alt="CAEM Logo" 
+                  className="h-12 w-auto"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div>
                 <h1 className="text-2xl font-bold">Pendaftaran Peserta</h1>
@@ -243,7 +309,40 @@ export default function RegisterPeserta() {
                     {fetchingSettings ? '...' : `Rp ${nominalPendaftaran.toLocaleString('id-ID')}`}
                   </span>
                 </div>
-                <p className="text-xs text-purple-600 mt-1 italic">* Pembayaran dilakukan setelah pendaftaran dikonfirmasi oleh admin cabang.</p>
+                <p className="text-xs text-purple-600 mt-1 italic">* Pembayaran dilakukan 100% lunas saat pendaftaran.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Upload Bukti Pembayaran</label>
+                <div className="relative group">
+                  <input
+                    type="file"
+                    required
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className={cn(
+                    "h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all",
+                    buktiBayar 
+                      ? "border-green-500 bg-green-50" 
+                      : "border-gray-200 bg-gray-50 group-hover:border-purple-400 group-hover:bg-purple-50"
+                  )}>
+                    {buktiBayar ? (
+                      <>
+                        <CheckCircle2 className="text-green-600" size={24} />
+                        <span className="text-xs font-medium text-green-700 truncate px-4 w-full text-center">
+                          {buktiBayar.name}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="text-gray-400 group-hover:text-purple-500" size={24} />
+                        <span className="text-xs font-medium text-gray-500 group-hover:text-purple-600">Pilih Foto Bukti Bayar</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 

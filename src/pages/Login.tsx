@@ -73,7 +73,12 @@ export default function Login() {
       >
         <div className="p-8 lg:p-12">
           <div className="text-center mb-10">
-            <h1 className="text-4xl font-extrabold text-blue-600 tracking-tight mb-2">CAEM</h1>
+            <img 
+              src="https://lh3.googleusercontent.com/d/1W2PxoxVqazsPJY9Ej3DawsZZLqs0lBZc?t=1" 
+              alt="CAEM Logo" 
+              className="h-20 w-auto mx-auto mb-4"
+              referrerPolicy="no-referrer"
+            />
             <p className="text-gray-500 font-medium">Sistem Manajemen Lembaga Bimbel</p>
           </div>
 

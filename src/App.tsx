@@ -15,6 +15,7 @@ import PengaturanPage from './pages/Pengaturan';
 import RegisterCabang from './pages/RegisterCabang';
 import RegisterSelection from './pages/RegisterSelection';
 import RegisterPeserta from './pages/RegisterPeserta';
+import TagihanPage from './pages/Tagihan';
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="cabang" element={<CabangPage user={user} />} />
           <Route path="peserta" element={<PesertaPage user={user} />} />
           <Route path="keuangan" element={<KeuanganPage user={user} />} />
+          <Route path="tagihan" element={<TagihanPage user={user} />} />
           <Route path="laporan" element={<LaporanPage user={user} />} />
           <Route path="pengaturan" element={<PengaturanPage user={user} />} />
         </Route>

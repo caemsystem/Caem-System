@@ -59,11 +59,28 @@
         "nominal": { "type": "number" },
         "porsiPusat": { "type": "number" },
         "porsiCabang": { "type": "number" },
-        "tipe": { "type": "string", "enum": ["pendaftaran_peserta", "biaya_bulanan"] },
-        "status": { "type": "string", "enum": ["paid", "pending"] },
+        "tipe": { "type": "string", "enum": ["pendaftaran_peserta", "biaya_bulanan", "pendaftaran_cabang", "pemasukan", "pengeluaran"] },
+        "status": { "type": "string", "enum": ["paid", "pending", "lunas"] },
+        "tagihanId": { "type": "string", "description": "Reference to Tagihan if billed" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["cabangId", "nominal", "createdAt"]
+    },
+    "Tagihan": {
+      "title": "Tagihan",
+      "description": "Invoices sent from central to branches for revenue sharing.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "cabangId": { "type": "string" },
+        "nominal": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid"] },
+        "transaksiIds": { "type": "array", "items": { "type": "string" } },
+        "buktiBayarUrl": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "paidAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cabangId", "nominal", "status", "transaksiIds", "createdAt"]
     },
     "Pengaturan": {
       "title": "Pengaturan",
@@ -71,6 +88,7 @@
       "type": "object",
       "properties": {
         "biayaPendaftaranCabang": { "type": "number" },
+        "biayaPendaftaranPeserta": { "type": "number" },
         "persentasePusat": { "type": "number", "description": "Percentage for central office (0-100)" },
         "persentaseCabang": { "type": "number", "description": "Percentage for branch office (0-100)" }
       }
@@ -81,6 +99,7 @@
     "/cabang/{cabangId}": { "schema": "Cabang", "description": "Branch offices" },
     "/peserta/{pesertaId}": { "schema": "Peserta", "description": "Students" },
     "/transaksi/{transaksiId}": { "schema": "Transaksi", "description": "Transactions" },
+    "/tagihan/{tagihanId}": { "schema": "Tagihan", "description": "Invoices" },
     "/pengaturan/global": { "schema": "Pengaturan", "description": "Global settings" }
   }
 }

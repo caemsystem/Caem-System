@@ -13,6 +13,12 @@ export default function RegisterSelection() {
         </Link>
 
         <div className="text-center mb-12">
+          <img 
+            src="https://lh3.googleusercontent.com/d/1W2PxoxVqazsPJY9Ej3DawsZZLqs0lBZc?t=1" 
+            alt="CAEM Logo" 
+            className="h-24 w-auto mx-auto mb-6"
+            referrerPolicy="no-referrer"
+          />
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">Pendaftaran CAEM</h1>
           <p className="text-gray-500 text-lg">Pilih jenis pendaftaran yang sesuai dengan kebutuhan Anda.</p>
         </div>

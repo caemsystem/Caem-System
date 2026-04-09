@@ -41,7 +41,9 @@ export interface Peserta {
   };
   cabangId: string; // 'pusat' or cabangId
   nominalPendaftaran?: number;
+  buktiBayarUrl?: string;
   statusPembayaran?: 'lunas' | 'belum_lunas';
+  status?: 'pending' | 'aktif' | 'rejected';
   createdAt: string;
 }
 
@@ -55,6 +57,7 @@ export interface Transaksi {
   tipe: 'pendaftaran_peserta' | 'biaya_bulanan' | 'pendaftaran_cabang' | 'pemasukan' | 'pengeluaran';
   status: 'paid' | 'pending' | 'lunas';
   keterangan?: string;
+  tagihanId?: string;
   createdAt: string;
 }
 
@@ -63,4 +66,16 @@ export interface Pengaturan {
   biayaPendaftaranPeserta: number;
   persentasePusat: number;
   persentaseCabang: number;
+}
+
+export interface Tagihan {
+  id: string;
+  cabangId: string;
+  nominal: number;
+  status: 'pending' | 'paid';
+  transaksiIds: string[];
+  keterangan?: string;
+  buktiBayarUrl?: string;
+  createdAt: any;
+  paidAt?: any;
 }

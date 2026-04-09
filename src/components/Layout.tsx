@@ -40,6 +40,7 @@ export default function Layout({ user }: LayoutProps) {
     { name: 'Cabang', path: '/cabang', icon: Building2, roles: ['admin', 'bendahara'] },
     { name: 'Peserta', path: '/peserta', icon: Users, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Keuangan', path: '/keuangan', icon: Wallet, roles: ['admin', 'bendahara', 'cabang'] },
+    { name: 'Tagihan', path: '/tagihan', icon: FileText, roles: ['cabang'] },
     { name: 'Laporan', path: '/laporan', icon: FileText, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Pengaturan', path: '/pengaturan', icon: Settings, roles: ['admin'] },
   ];
@@ -73,8 +74,13 @@ export default function Layout({ user }: LayoutProps) {
       )}>
         <div className="h-full flex flex-col">
           <div className="p-6 border-b border-gray-100">
-            <h1 className="text-2xl font-bold text-blue-600 tracking-tight">CAEM</h1>
-            <p className="text-xs text-gray-500 font-medium mt-1">Sistem Manajemen Bimbel</p>
+            <img 
+              src="https://lh3.googleusercontent.com/d/1W2PxoxVqazsPJY9Ej3DawsZZLqs0lBZc?t=1" 
+              alt="CAEM Logo" 
+              className="h-12 w-auto mb-2"
+              referrerPolicy="no-referrer"
+            />
+            <p className="text-xs text-gray-500 font-medium">Sistem Manajemen Bimbel</p>
           </div>
 
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

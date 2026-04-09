@@ -50,3 +50,57 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+export function formatDate(date: any, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return '-';
+  
+  let d: Date;
+  if (typeof date.toDate === 'function') {
+    d = date.toDate();
+  } else if (date instanceof Date) {
+    d = date;
+  } else {
+    d = new Date(date);
+  }
+
+  if (isNaN(d.getTime())) return '-';
+  
+  return d.toLocaleDateString('id-ID', options);
+}
+
+export function toISODate(date: any): string {
+  if (!date) return '';
+  
+  let d: Date;
+  if (typeof date.toDate === 'function') {
+    d = date.toDate();
+  } else if (date instanceof Date) {
+    d = date;
+  } else {
+    d = new Date(date);
+  }
+
+  if (isNaN(d.getTime())) return '';
+  
+  try {
+    return d.toISOString().split('T')[0];
+  } catch (e) {
+    return '';
+  }
+}
+
+export function toDate(date: any): Date | null {
+  if (!date) return null;
+  
+  let d: Date;
+  if (typeof date.toDate === 'function') {
+    d = date.toDate();
+  } else if (date instanceof Date) {
+    d = date;
+  } else {
+    d = new Date(date);
+  }
+
+  if (isNaN(d.getTime())) return null;
+  return d;
+}

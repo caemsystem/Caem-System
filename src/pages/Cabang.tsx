@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { collection, query, getDocs, doc, updateDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, serverTimestamp, orderBy, where, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Cabang } from '../types';
+import { handleFirestoreError, OperationType, formatDate } from '../lib/firestore-utils';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -14,7 +15,8 @@ import {
   Calendar,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -29,6 +31,14 @@ export default function CabangPage({ user }: CabangPageProps) {
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'aktif' | 'rejected'>('all');
   const [selectedCabang, setSelectedCabang] = useState<Cabang | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   useEffect(() => {
     fetchCabang();
@@ -130,6 +140,40 @@ export default function CabangPage({ user }: CabangPageProps) {
     }
   };
 
+  const handleDeleteCabang = async (id: string) => {
+    setIsProcessing(true);
+    try {
+      // 1. Delete associated users
+      const userSnap = await getDocs(query(collection(db, 'users'), where('cabangId', '==', id)));
+      for (const userDoc of userSnap.docs) {
+        await deleteDoc(doc(db, 'users', userDoc.id));
+      }
+
+      // 2. Delete associated peserta
+      const pesertaSnap = await getDocs(query(collection(db, 'peserta'), where('cabangId', '==', id)));
+      for (const pDoc of pesertaSnap.docs) {
+        await deleteDoc(doc(db, 'peserta', pDoc.id));
+      }
+
+      // 3. Delete associated transactions
+      const txSnap = await getDocs(query(collection(db, 'transaksi'), where('cabangId', '==', id)));
+      for (const txDoc of txSnap.docs) {
+        await deleteDoc(doc(db, 'transaksi', txDoc.id));
+      }
+
+      // 4. Delete the cabang itself
+      await deleteDoc(doc(db, 'cabang', id));
+
+      setSuccessMessage('Data cabang berhasil dihapus!');
+      fetchCabang();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error deleting cabang:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const filteredCabang = cabangList.filter(c => {
     const matchesSearch = c.namaCabang.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          c.namaKepala.toLowerCase().includes(searchTerm.toLowerCase());
@@ -139,6 +183,21 @@ export default function CabangPage({ user }: CabangPageProps) {
 
   return (
     <div className="space-y-6">
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3"
+          >
+            <CheckCircle2 size={20} />
+            <span className="font-bold text-sm">{successMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
         <div className="relative flex-1 max-w-md">
@@ -221,12 +280,24 @@ export default function CabangPage({ user }: CabangPageProps) {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => { setSelectedCabang(cabang); setIsModalOpen(true); }}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                      >
-                        <Eye size={20} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => { setSelectedCabang(cabang); setIsModalOpen(true); }}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Detail Cabang"
+                        >
+                          <Eye size={20} />
+                        </button>
+                        {user.role === 'admin' && (
+                          <button 
+                            onClick={() => handleDeleteCabang(cabang.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Hapus Cabang"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -346,7 +417,7 @@ export default function CabangPage({ user }: CabangPageProps) {
                           <div>
                             <p className="text-xs text-gray-500">Tanggal Daftar</p>
                             <p className="text-sm font-medium text-gray-700">
-                              {new Date(selectedCabang.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                              {formatDate(selectedCabang.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}
                             </p>
                           </div>
                         </div>

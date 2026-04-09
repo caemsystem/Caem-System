@@ -52,6 +52,17 @@ service cloud.firestore {
     //   - persentasePusat: number
     //   - persentaseCabang: number
     //
+    // Collection: tagihan
+    // Document ID: auto-generated
+    // Fields:
+    //   - cabangId: string (required)
+    //   - nominal: number (required)
+    //   - status: string (required, enum: ['pending', 'paid'])
+    //   - transaksiIds: list (required)
+    //   - buktiBayarUrl: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - paidAt: timestamp (optional)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -72,11 +83,18 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
           request.auth.token.email == "risamari721@gmail.com" ||
-          request.auth.token.email == "admin@caem.com"
+          request.auth.token.email == "admin@caem.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
         );
+    }
+
+    // Blanket permission for admin email
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "risamari721@gmail.com" || 
+         request.auth.token.email == "admin@caem.com");
     }
 
     function isBendahara() {
@@ -142,6 +160,7 @@ service cloud.firestore {
              (data.createdAt is timestamp || data.createdAt == request.time) &&
              (!('dataDiri' in data) || data.dataDiri is map) &&
              (!('nominalPendaftaran' in data) || data.nominalPendaftaran is number) &&
+             (!('buktiBayarUrl' in data) || data.buktiBayarUrl is string) &&
              (!('statusPembayaran' in data) || data.statusPembayaran is string) &&
              (!('status' in data) || data.status is string);
     }
@@ -154,7 +173,19 @@ service cloud.firestore {
              data.tipe is string &&
              data.status is string &&
              (data.createdAt is timestamp || data.createdAt == request.time) &&
-             (!('keterangan' in data) || data.keterangan is string);
+             (!('keterangan' in data) || data.keterangan is string) &&
+             (!('tagihanId' in data) || data.tagihanId is string);
+    }
+
+    function isValidTagihan(data) {
+      return data.cabangId is string &&
+             data.nominal is number &&
+             data.status in ['pending', 'paid'] &&
+             data.transaksiIds is list &&
+             (data.createdAt is timestamp || data.createdAt == request.time) &&
+             (!('buktiBayarUrl' in data) || data.buktiBayarUrl is string) &&
+             (!('paidAt' in data) || data.paidAt is timestamp || data.paidAt == null) &&
+             (!('verified' in data) || data.verified is bool);
     }
 
     // ===============================================================
@@ -165,24 +196,34 @@ service cloud.firestore {
       allow read: if isOwner(uid) || isAdmin() || isBendahara();
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(uid) || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(uid) || isAdmin());
+      allow delete: if isSuperAdmin() || isAdmin();
     }
 
     match /cabang/{cabangId} {
       allow read: if isAdmin() || isBendahara() || isCabangOwner(cabangId) || resource.data.status == 'aktif';
       allow create: if isAuthenticated() && isValidCabang(request.resource.data); // Anyone can register a branch
       allow update: if isAdmin() || isBendahara() || (isCabangOwner(cabangId) && request.resource.data.status == resource.data.status);
+      allow delete: if isSuperAdmin() || isAdmin();
     }
 
     match /peserta/{pesertaId} {
       allow read: if isAdmin() || isBendahara() || isAktifCabang(resource.data.cabangId);
-      allow create: if true;
+      allow create: if isValidPeserta(request.resource.data);
       allow update: if isAdmin() || isBendahara() || (isAktifCabang(resource.data.cabangId) && request.resource.data.cabangId == resource.data.cabangId);
+      allow delete: if isSuperAdmin() || isAdmin() || isBendahara() || isAktifCabang(resource.data.cabangId);
     }
 
     match /transaksi/{transaksiId} {
       allow read: if isAdmin() || isBendahara() || isAktifCabang(resource.data.cabangId);
-      allow create: if true;
-      allow update: if isAdmin() || isBendahara();
+      allow create: if isValidTransaksi(request.resource.data);
+      allow update: if isAdmin() || isBendahara() || (isAktifCabang(resource.data.cabangId) && request.resource.data.tagihanId == null);
+      allow delete: if isSuperAdmin() || isAdmin() || isBendahara() || isAktifCabang(resource.data.cabangId);
+    }
+
+    match /tagihan/{tagihanId} {
+      allow read: if isAdmin() || isBendahara() || isCabangOwner(resource.data.cabangId);
+      allow create: if isAdmin() || isBendahara();
+      allow update: if isAdmin() || isBendahara() || (isCabangOwner(resource.data.cabangId) && request.resource.data.status == 'paid');
     }
 
     match /pengaturan/{docId} {

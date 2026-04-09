@@ -303,8 +303,13 @@ export default function RegisterCabang() {
         >
           <div className="bg-blue-600 p-8 text-white">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-white/20 rounded-2xl">
-                <Building2 size={32} />
+              <div className="p-2 bg-white rounded-2xl">
+                <img 
+                  src="https://lh3.googleusercontent.com/d/1W2PxoxVqazsPJY9Ej3DawsZZLqs0lBZc?t=1" 
+                  alt="CAEM Logo" 
+                  className="h-12 w-auto"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <div>
                 <h1 className="text-2xl font-bold">Pendaftaran Cabang Baru</h1>

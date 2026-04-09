@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, getDocs, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, getDocs, where, orderBy, limit, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Cabang, Peserta, Transaksi, Pengaturan, Tagihan } from '../types';
 import { handleFirestoreError, OperationType, formatDate, toDate } from '../lib/firestore-utils';
@@ -48,9 +48,9 @@ export default function Dashboard({ user }: DashboardProps) {
     const fetchData = async () => {
       try {
         // Fetch Pengaturan
-        const settingsSnap = await getDocs(collection(db, 'pengaturan'));
-        if (!settingsSnap.empty) {
-          setPengaturan(settingsSnap.docs[0].data() as Pengaturan);
+        const settingsDoc = await getDoc(doc(db, 'pengaturan', 'global'));
+        if (settingsDoc.exists()) {
+          setPengaturan(settingsDoc.data() as Pengaturan);
         }
 
         // 1. Fetch Stats

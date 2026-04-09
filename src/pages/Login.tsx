@@ -20,9 +20,15 @@ export default function Login() {
 
     try {
       // Special case for default admin
-      let loginEmail = email.toLowerCase();
+      let loginEmail = email.trim().toLowerCase();
       if (loginEmail === 'admincaem') {
         loginEmail = 'admin@caem.com';
+      }
+
+      if (!loginEmail.includes('@')) {
+        setError('Format email tidak valid.');
+        setLoading(false);
+        return;
       }
 
       const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);

@@ -227,7 +227,7 @@ service cloud.firestore {
     }
 
     match /pengaturan/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
   }

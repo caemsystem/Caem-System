@@ -1,5 +1,5 @@
 import React, { useEffect, useState, FormEvent } from 'react';
-import { collection, query, getDocs, addDoc, serverTimestamp, where, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, where, orderBy, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Peserta, Cabang, Pengaturan } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
@@ -96,13 +96,13 @@ export default function PesertaPage({ user }: PesertaPageProps) {
     e.preventDefault();
     try {
       // Fetch settings for registration fee
-      const settingsSnap = await getDocs(collection(db, 'pengaturan'));
-      const settings = (settingsSnap.docs[0]?.data() as Pengaturan) || { 
-        biayaPendaftaranCabang: 5000000,
+      const settingsDoc = await getDoc(doc(db, 'pengaturan', 'global'));
+      const settings = (settingsDoc.exists() ? settingsDoc.data() as Pengaturan : { 
+        biayaPendaftaranCabang: 10000000,
         biayaPendaftaranPeserta: 150000,
         persentasePusat: 30, 
         persentaseCabang: 70 
-      };
+      });
 
       const nominal = settings.biayaPendaftaranPeserta;
 

@@ -35,9 +35,11 @@ export default function KeuanganPage({ user }: KeuanganPageProps) {
   const [pendingPeserta, setPendingPeserta] = useState<Peserta[]>([]);
   const [activeTab, setActiveTab] = useState<'transaksi' | 'tagihan' | 'pengaturan' | 'verifikasi'>('transaksi');
   const [settings, setSettings] = useState<Pengaturan>({
-    biayaPendaftaranCabang: 5000000,
+    biayaPendaftaranCabang: 10000000,
     persentasePusat: 30,
     persentaseCabang: 70,
+    persentaseMinimalDP: 50,
+    biayaPendaftaranPeserta: 150000,
   });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -744,6 +746,18 @@ export default function KeuanganPage({ user }: KeuanganPageProps) {
                       />
                     </div>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Minimal DP Cabang (%)</label>
+                  <input
+                    type="number"
+                    max={100}
+                    value={settings.persentaseMinimalDP || 50}
+                    onChange={e => setSettings({ ...settings, persentaseMinimalDP: Number(e.target.value) })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Persentase minimal pembayaran awal untuk pendaftaran cabang.</p>
                 </div>
 
                 <button

@@ -41,7 +41,7 @@ export default function Layout({ user }: LayoutProps) {
     { name: 'Peserta', path: '/peserta', icon: Users, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Keuangan', path: '/keuangan', icon: Wallet, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Tagihan', path: '/tagihan', icon: FileText, roles: ['cabang'] },
-    { name: 'Laporan', path: '/laporan', icon: FileText, roles: ['admin', 'bendahara', 'cabang'] },
+    { name: 'Laporan', path: '/laporan', icon: FileText, roles: ['admin'] },
     { name: 'Pengaturan', path: '/pengaturan', icon: Settings, roles: ['admin'] },
   ];
 

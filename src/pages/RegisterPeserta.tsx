@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate, Link } from 'react-router-dom';
 import { GraduationCap, CheckCircle2, AlertCircle, ArrowLeft, Building2, User, Phone, Upload } from 'lucide-react';
@@ -67,14 +67,21 @@ export default function RegisterPeserta() {
 
     const fetchSettings = async () => {
       try {
-        const settingsSnap = await getDocs(collection(db, 'pengaturan'));
-        if (!settingsSnap.empty) {
-          const settings = settingsSnap.docs[0].data() as Pengaturan;
+        console.log('Fetching settings from pengaturan/global...');
+        const settingsDoc = await getDoc(doc(db, 'pengaturan', 'global'));
+        if (settingsDoc.exists()) {
+          const settings = settingsDoc.data() as Pengaturan;
+          console.log('Settings fetched:', settings);
           setPengaturan(settings);
-          setNominalPendaftaran(settings.biayaPendaftaranPeserta || 150000);
+          const items = settings.rincianBiayaPeserta || [];
+          const totalFromItems = items.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0);
+          setNominalPendaftaran(totalFromItems > 0 ? totalFromItems : (settings.biayaPendaftaranPeserta || 150000));
+        } else {
+          console.warn('Settings document not found at pengaturan/global');
         }
-      } catch (err) {
-        console.warn('Failed to fetch settings, using default:', err);
+      } catch (err: any) {
+        console.error('Failed to fetch settings:', err);
+        setError('Gagal memuat rincian biaya. Silakan refresh halaman.');
       } finally {
         setFetchingSettings(false);
       }
@@ -160,8 +167,15 @@ export default function RegisterPeserta() {
 
         // Also create a transaction record
         const isPusat = formData.cabangId === 'pusat';
-        const porsiPusat = isPusat ? nominalPendaftaran : (nominalPendaftaran * (pengaturan?.persentasePusat || 30) / 100);
-        const porsiCabang = isPusat ? 0 : (nominalPendaftaran * (pengaturan?.persentaseCabang || 70) / 100);
+        let porsiPusat = 0;
+        if (isPusat) {
+          porsiPusat = nominalPendaftaran;
+        } else if (pengaturan?.rincianBiayaPeserta && pengaturan.rincianBiayaPeserta.length > 0) {
+          porsiPusat = pengaturan.rincianBiayaPeserta.reduce((sum, item) => sum + (item.nominalPusat || 0), 0);
+        } else {
+          porsiPusat = (nominalPendaftaran * (pengaturan?.persentasePusat || 30) / 100);
+        }
+        const porsiCabang = nominalPendaftaran - porsiPusat;
 
         await addDoc(collection(db, 'transaksi'), {
           pesertaId: pesertaRef.id,
@@ -302,14 +316,43 @@ export default function RegisterPeserta() {
                 {fetchingCabang && <p className="text-xs text-gray-400 mt-1">Memuat daftar cabang...</p>}
               </div>
 
-              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-purple-700">Biaya Pendaftaran (100% Lunas)</span>
-                  <span className="text-lg font-bold text-purple-900">
+              <div className="p-5 bg-purple-50 rounded-2xl border border-purple-100 space-y-3">
+                <div className="flex justify-between items-center border-b border-purple-200 pb-2">
+                  <span className="text-sm font-bold text-purple-700 uppercase tracking-wider">Rincian Biaya</span>
+                  <span className="text-xs font-medium text-purple-600 italic">100% Lunas</span>
+                </div>
+                
+                <div className="space-y-2">
+                  {fetchingSettings ? (
+                    <div className="animate-pulse space-y-2">
+                      <div className="h-4 bg-purple-200 rounded w-full"></div>
+                      <div className="h-4 bg-purple-200 rounded w-3/4"></div>
+                    </div>
+                  ) : (
+                    <>
+                      {pengaturan?.rincianBiayaPeserta && pengaturan.rincianBiayaPeserta.length > 0 ? (
+                        pengaturan.rincianBiayaPeserta.map((item, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-purple-700">{item.nama}</span>
+                            <span className="font-bold text-purple-900">Rp {(item.nominal || 0).toLocaleString('id-ID')}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-purple-700">Biaya Pendaftaran</span>
+                          <span className="font-bold text-purple-900">Rp {nominalPendaftaran.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-purple-200 flex justify-between items-center">
+                  <span className="text-sm font-bold text-purple-900">Total Pembayaran</span>
+                  <span className="text-xl font-black text-purple-600">
                     {fetchingSettings ? '...' : `Rp ${nominalPendaftaran.toLocaleString('id-ID')}`}
                   </span>
                 </div>
-                <p className="text-xs text-purple-600 mt-1 italic">* Pembayaran dilakukan 100% lunas saat pendaftaran.</p>
               </div>
 
               <div className="space-y-2">

@@ -31,6 +31,17 @@ export default function LaporanPage({ user }: LaporanPageProps) {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [filterCabang, setFilterCabang] = useState('all');
 
+  if (user.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Akses Ditolak</h2>
+          <p className="text-gray-500 text-sm">Halaman ini hanya dapat diakses oleh Admin Utama.</p>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     fetchData();
   }, [user]);
@@ -38,17 +49,12 @@ export default function LaporanPage({ user }: LaporanPageProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let txQuery = query(collection(db, 'transaksi'), orderBy('createdAt', 'desc'));
-      if (user.role === 'cabang') {
-        txQuery = query(collection(db, 'transaksi'), where('cabangId', '==', user.cabangId), orderBy('createdAt', 'desc'));
-      }
+      const txQuery = query(collection(db, 'transaksi'), orderBy('createdAt', 'desc'));
       const txSnap = await getDocs(txQuery);
       setTransactions(txSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Transaksi)));
 
-      if (user.role !== 'cabang') {
-        const cSnap = await getDocs(collection(db, 'cabang'));
-        setCabangList(cSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cabang)));
-      }
+      const cSnap = await getDocs(collection(db, 'cabang'));
+      setCabangList(cSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Cabang)));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'laporan_data');
     } finally {
@@ -149,23 +155,21 @@ export default function LaporanPage({ user }: LaporanPageProps) {
             </div>
           </div>
 
-          {user.role !== 'cabang' && (
-            <div className="w-full lg:w-64">
-              <label className="block text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Filter Cabang</label>
-              <div className="relative">
-                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <select
-                  value={filterCabang}
-                  onChange={e => setFilterCabang(e.target.value)}
-                  className="w-full pl-11 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium appearance-none"
-                >
-                  <option value="all">Semua Cabang</option>
-                  <option value="pusat">Pusat</option>
-                  {cabangList.map(c => <option key={c.id} value={c.id}>{c.namaCabang}</option>)}
-                </select>
-              </div>
+          <div className="w-full lg:w-64">
+            <label className="block text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Filter Cabang</label>
+            <div className="relative">
+              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <select
+                value={filterCabang}
+                onChange={e => setFilterCabang(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium appearance-none"
+              >
+                <option value="all">Semua Cabang</option>
+                <option value="pusat">Pusat</option>
+                {cabangList.map(c => <option key={c.id} value={c.id}>{c.namaCabang}</option>)}
+              </select>
             </div>
-          )}
+          </div>
 
           <div className="flex gap-3">
             <button 

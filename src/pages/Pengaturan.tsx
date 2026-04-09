@@ -43,10 +43,11 @@ interface PengaturanPageProps {
 
 export default function PengaturanPage({ user }: PengaturanPageProps) {
   const [settings, setSettings] = useState<Pengaturan>({
-    biayaPendaftaranCabang: 5000000,
+    biayaPendaftaranCabang: 10000000,
     biayaPendaftaranPeserta: 150000,
     persentasePusat: 30,
     persentaseCabang: 70,
+    persentaseMinimalDP: 50,
   });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -85,15 +86,22 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
     setUserActionLoading(true);
     try {
       const secondaryAuth = getSecondaryAuth();
+      const email = newUser.email.trim();
+      if (!email || !email.includes('@')) {
+        alert('Format email tidak valid.');
+        setUserActionLoading(false);
+        return;
+      }
+
       // Create user in secondary app
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUser.email, newUser.password);
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, newUser.password);
       const uid = userCredential.user.uid;
 
       // Create profile in Firestore (using primary db)
       await setDoc(doc(db, 'users', uid), {
         uid,
-        email: newUser.email,
-        displayName: newUser.displayName,
+        email: newUser.email.trim(),
+        displayName: newUser.displayName.trim(),
         role: newUser.role,
         createdAt: serverTimestamp(),
       });
@@ -140,13 +148,57 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
     try {
       const settingsDoc = await getDoc(doc(db, path));
       if (settingsDoc.exists()) {
-        setSettings(prev => ({ ...prev, ...settingsDoc.data() }));
+        const data = settingsDoc.data() as Pengaturan;
+        setSettings(prev => ({ 
+          ...prev, 
+          ...data,
+          rincianBiayaCabang: data.rincianBiayaCabang || [],
+          rincianBiayaPeserta: data.rincianBiayaPeserta || [],
+        }));
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);
     } finally {
       setLoading(false);
     }
+  };
+
+  const addItem = (type: 'cabang' | 'peserta') => {
+    const key = type === 'cabang' ? 'rincianBiayaCabang' : 'rincianBiayaPeserta';
+    const current = settings[key] || [];
+    setSettings({
+      ...settings,
+      [key]: [...current, { nama: '', nominal: 0, nominalPusat: 0 }]
+    });
+  };
+
+  const removeItem = (type: 'cabang' | 'peserta', index: number) => {
+    const key = type === 'cabang' ? 'rincianBiayaCabang' : 'rincianBiayaPeserta';
+    const current = settings[key] || [];
+    const updated = current.filter((_, i) => i !== index);
+    const totalKey = type === 'cabang' ? 'biayaPendaftaranCabang' : 'biayaPendaftaranPeserta';
+    const newTotal = updated.reduce((sum, item) => sum + item.nominal, 0);
+    
+    setSettings({
+      ...settings,
+      [key]: updated,
+      [totalKey]: newTotal
+    });
+  };
+
+  const updateItem = (type: 'cabang' | 'peserta', index: number, field: 'nama' | 'nominal' | 'nominalPusat', value: string | number) => {
+    const key = type === 'cabang' ? 'rincianBiayaCabang' : 'rincianBiayaPeserta';
+    const current = [...(settings[key] || [])];
+    current[index] = { ...current[index], [field]: value };
+    
+    const newTotal = current.reduce((sum, item) => sum + item.nominal, 0);
+    const totalKey = type === 'cabang' ? 'biayaPendaftaranCabang' : 'biayaPendaftaranPeserta';
+
+    setSettings({
+      ...settings,
+      [key]: current,
+      [totalKey]: newTotal
+    });
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -245,7 +297,156 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
                       onChange={e => setSettings({ ...settings, persentasePusat: Number(e.target.value), persentaseCabang: 100 - Number(e.target.value) })}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                     />
-                    <p className="text-[10px] sm:text-xs text-gray-400">Porsi pendapatan yang masuk ke kas pusat.</p>
+                    <p className="text-[10px] sm:text-xs text-gray-400">Porsi pendapatan yang masuk ke kas pusat (berlaku jika peserta memilih cabang).</p>
+                  </div>
+
+                  <div className="space-y-3 sm:space-y-4">
+                    <label className="block text-sm font-bold text-gray-700">Minimal DP Cabang (%)</label>
+                    <input
+                      type="number"
+                      max={100}
+                      value={settings.persentaseMinimalDP || 50}
+                      onChange={e => setSettings({ ...settings, persentaseMinimalDP: Number(e.target.value) })}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                    />
+                    <p className="text-[10px] sm:text-xs text-gray-400">Persentase minimal pembayaran awal untuk pendaftaran cabang.</p>
+                  </div>
+                </div>
+
+                {/* Rincian Biaya Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-gray-100">
+                  {/* Rincian Biaya Cabang */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                        <Building2 size={18} className="text-blue-600" />
+                        Rincian Biaya Cabang
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => addItem('cabang')}
+                        className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {settings.rincianBiayaCabang?.map((item, idx) => (
+                        <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                          <div className="flex gap-2">
+                            <input
+                              placeholder="Nama Item (misal: Biaya Sewa)"
+                              className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                              value={item.nama || ''}
+                              onChange={e => updateItem('cabang', idx, 'nama', e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeItem('cabang', idx)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase">Total Biaya</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rp</span>
+                                <input
+                                  type="number"
+                                  className="w-full pl-7 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                                  value={item.nominal || 0}
+                                  onChange={e => updateItem('cabang', idx, 'nominal', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase">Porsi Pusat</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rp</span>
+                                <input
+                                  type="number"
+                                  className="w-full pl-7 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-600"
+                                  value={item.nominalPusat || 0}
+                                  onChange={e => updateItem('cabang', idx, 'nominalPusat', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {(!settings.rincianBiayaCabang || settings.rincianBiayaCabang.length === 0) && (
+                        <p className="text-xs text-gray-400 italic">Belum ada rincian biaya.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rincian Biaya Peserta */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                        <Users size={18} className="text-blue-600" />
+                        Rincian Biaya Peserta
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => addItem('peserta')}
+                        className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {settings.rincianBiayaPeserta?.map((item, idx) => (
+                        <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                          <div className="flex gap-2">
+                            <input
+                              placeholder="Nama Item (misal: Kaos)"
+                              className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                              value={item.nama || ''}
+                              onChange={e => updateItem('peserta', idx, 'nama', e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeItem('peserta', idx)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase">Total Biaya</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rp</span>
+                                <input
+                                  type="number"
+                                  className="w-full pl-7 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                                  value={item.nominal || 0}
+                                  onChange={e => updateItem('peserta', idx, 'nominal', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-gray-500 uppercase">Porsi Pusat</label>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rp</span>
+                                <input
+                                  type="number"
+                                  className="w-full pl-7 pr-2 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-600"
+                                  value={item.nominalPusat || 0}
+                                  onChange={e => updateItem('peserta', idx, 'nominalPusat', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {(!settings.rincianBiayaPeserta || settings.rincianBiayaPeserta.length === 0) && (
+                        <p className="text-xs text-gray-400 italic">Belum ada rincian biaya.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 

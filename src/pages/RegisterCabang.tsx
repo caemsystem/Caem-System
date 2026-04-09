@@ -38,14 +38,16 @@ export default function RegisterCabang() {
     email: '',
     password: '',
     metodePembayaran: 'lunas' as 'lunas' | 'cicil',
-    nominalBayar: 0,
+    nominalBayar: 5000000,
   });
   const [files, setFiles] = useState<{ [key: string]: File | null }>({
     ktp: null,
     foto: null,
     buktiBayar: null,
   });
-  const [nominalPendaftaran, setNominalPendaftaran] = useState(5000000);
+  const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
+  const [nominalPendaftaran, setNominalPendaftaran] = useState(10000000);
+  const [persentaseMinimalDP, setPersentaseMinimalDP] = useState(50);
   const [loading, setLoading] = useState(false);
   const [fetchingSettings, setFetchingSettings] = useState(true);
   const [success, setSuccess] = useState(false);
@@ -72,15 +74,25 @@ export default function RegisterCabang() {
     const fetchSettings = async () => {
       try {
         const regDb = getRegDb();
-        const settingsSnap = await getDocs(collection(regDb, 'pengaturan'));
-        if (!settingsSnap.empty) {
-          const settings = settingsSnap.docs[0].data() as Pengaturan;
-          const fee = settings.biayaPendaftaranCabang || 5000000;
+        console.log('Fetching settings from pengaturan/global (RegApp)...');
+        const settingsDoc = await getDoc(doc(regDb, 'pengaturan', 'global'));
+        if (settingsDoc.exists()) {
+          const settings = settingsDoc.data() as Pengaturan;
+          console.log('Settings fetched (RegApp):', settings);
+          setPengaturan(settings);
+          const items = settings.rincianBiayaCabang || [];
+          const totalFromItems = items.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0);
+          const fee = totalFromItems > 0 ? totalFromItems : (settings.biayaPendaftaranCabang || 10000000);
+          const dpPercent = settings.persentaseMinimalDP || 50;
           setNominalPendaftaran(fee);
+          setPersentaseMinimalDP(dpPercent);
           setFormData(prev => ({ ...prev, nominalBayar: fee }));
+        } else {
+          console.warn('Settings document not found at pengaturan/global (RegApp)');
         }
-      } catch (err) {
-        console.warn('Failed to fetch settings, using default:', err);
+      } catch (err: any) {
+        console.error('Failed to fetch settings (RegApp):', err);
+        setError('Gagal memuat rincian biaya. Silakan refresh halaman.');
       } finally {
         setFetchingSettings(false);
       }
@@ -146,9 +158,9 @@ export default function RegisterCabang() {
       return setError('Silakan upload semua dokumen yang diperlukan.');
     }
     if (formData.metodePembayaran === 'cicil') {
-      const minDP = nominalPendaftaran * 0.5;
+      const minDP = nominalPendaftaran * (persentaseMinimalDP / 100);
       if (formData.nominalBayar < minDP) {
-        return setError(`Minimal DP adalah 50% dari total biaya (Rp ${minDP.toLocaleString('id-ID')})`);
+        return setError(`Minimal DP adalah ${persentaseMinimalDP}% dari total biaya (Rp ${minDP.toLocaleString('id-ID')})`);
       }
     } else {
       if (formData.nominalBayar < nominalPendaftaran) {
@@ -162,16 +174,23 @@ export default function RegisterCabang() {
     try {
       const regAuth = getRegAuth();
       const regDb = getRegDb();
+      const email = formData.email.trim();
+
+      if (!email || !email.includes('@')) {
+        setError('Format email tidak valid.');
+        setLoading(false);
+        return;
+      }
       
       // 1. Create or Get Auth User
       let uid = '';
       try {
-        const userCredential = await createUserWithEmailAndPassword(regAuth, formData.email, formData.password);
+        const userCredential = await createUserWithEmailAndPassword(regAuth, email, formData.password);
         uid = userCredential.user.uid;
       } catch (authErr: any) {
         if (authErr.code === 'auth/email-already-in-use') {
           try {
-            const signInCred = await signInWithEmailAndPassword(regAuth, formData.email, formData.password);
+            const signInCred = await signInWithEmailAndPassword(regAuth, email, formData.password);
             uid = signInCred.user.uid;
             let userDoc;
             try {
@@ -406,11 +425,36 @@ export default function RegisterCabang() {
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-gray-900 border-l-4 border-blue-600 pl-3">Metode Pembayaran</h3>
               <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 space-y-6">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-700">Total Biaya Pendaftaran</span>
+                <div className="flex justify-between items-center border-b border-blue-200 pb-2">
+                  <span className="text-sm font-bold text-blue-700 uppercase tracking-wider">Rincian Biaya Pendaftaran</span>
                   <span className="text-xl font-bold text-blue-900">
                     {fetchingSettings ? '...' : `Rp ${nominalPendaftaran.toLocaleString('id-ID')}`}
                   </span>
+                </div>
+
+                <div className="space-y-2">
+                  {fetchingSettings ? (
+                    <div className="animate-pulse space-y-2">
+                      <div className="h-4 bg-blue-200 rounded w-full"></div>
+                      <div className="h-4 bg-blue-200 rounded w-3/4"></div>
+                    </div>
+                  ) : (
+                    <>
+                      {pengaturan?.rincianBiayaCabang && pengaturan.rincianBiayaCabang.length > 0 ? (
+                        pengaturan.rincianBiayaCabang.map((item, idx) => (
+                          <div key={idx} className="flex justify-between text-sm">
+                            <span className="text-blue-700">{item.nama}</span>
+                            <span className="font-bold text-blue-900">Rp {(item.nominal || 0).toLocaleString('id-ID')}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-blue-700">Biaya Pendaftaran Cabang</span>
+                          <span className="font-bold text-blue-900">Rp {nominalPendaftaran.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -429,7 +473,7 @@ export default function RegisterCabang() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, metodePembayaran: 'cicil', nominalBayar: nominalPendaftaran * 0.5 })}
+                    onClick={() => setFormData({ ...formData, metodePembayaran: 'cicil', nominalBayar: nominalPendaftaran * (persentaseMinimalDP / 100) })}
                     className={cn(
                       "p-4 rounded-2xl border-2 transition-all text-left",
                       formData.metodePembayaran === 'cicil'
@@ -438,7 +482,7 @@ export default function RegisterCabang() {
                     )}
                   >
                     <div className="font-bold text-gray-900">Cicil (DP)</div>
-                    <div className="text-xs text-gray-500">Minimal DP 50%</div>
+                    <div className="text-xs text-gray-500">Minimal DP {persentaseMinimalDP}%</div>
                   </button>
                 </div>
 
@@ -452,13 +496,13 @@ export default function RegisterCabang() {
                     <input
                       type="number"
                       required
-                      min={nominalPendaftaran * 0.5}
+                      min={nominalPendaftaran * (persentaseMinimalDP / 100)}
                       max={nominalPendaftaran}
                       className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-900"
                       value={formData.nominalBayar}
                       onChange={e => setFormData({ ...formData, nominalBayar: Number(e.target.value) })}
                     />
-                    <p className="text-[10px] text-blue-500 italic">* Minimal DP: Rp {(nominalPendaftaran * 0.5).toLocaleString('id-ID')}</p>
+                    <p className="text-[10px] text-blue-500 italic">* Minimal DP: Rp {(nominalPendaftaran * (persentaseMinimalDP / 100)).toLocaleString('id-ID')}</p>
                   </motion.div>
                 )}
 

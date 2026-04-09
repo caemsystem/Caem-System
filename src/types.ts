@@ -61,11 +61,20 @@ export interface Transaksi {
   createdAt: string;
 }
 
+export interface ItemBiaya {
+  nama: string;
+  nominal: number;
+  nominalPusat: number;
+}
+
 export interface Pengaturan {
   biayaPendaftaranCabang: number;
   biayaPendaftaranPeserta: number;
   persentasePusat: number;
   persentaseCabang: number;
+  persentaseMinimalDP?: number;
+  rincianBiayaCabang?: ItemBiaya[];
+  rincianBiayaPeserta?: ItemBiaya[];
 }
 
 export interface Tagihan {

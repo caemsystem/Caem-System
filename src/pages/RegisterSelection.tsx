@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Users, ArrowLeft, GraduationCap } from 'lucide-react';
+import { Building2, Users, ArrowLeft, GraduationCap, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function RegisterSelection() {
@@ -63,6 +63,30 @@ export default function RegisterSelection() {
               Daftar Cabang
             </Link>
           </motion.div>
+        </div>
+
+        <div className="mt-16 text-center">
+          <p className="text-gray-500 font-medium mb-6">Butuh bantuan pendaftaran? Hubungi Admin kami:</p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <a 
+              href="https://wa.me/6285226046203" 
+              target="_blank" 
+              rel="noreferrer"
+              className="flex items-center gap-3 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-100 transition-all active:scale-95"
+            >
+              <MessageCircle size={20} />
+              WhatsApp Iman
+            </a>
+            <a 
+              href="https://wa.me/6289685316147" 
+              target="_blank" 
+              rel="noreferrer"
+              className="flex items-center gap-3 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-100 transition-all active:scale-95"
+            >
+              <MessageCircle size={20} />
+              WhatsApp Siti Herlasani
+            </a>
+          </div>
         </div>
       </div>
     </div>

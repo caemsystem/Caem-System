@@ -11,7 +11,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  GraduationCap
 } from 'lucide-react';
 import { useState } from 'react';
 import { clsx, type ClassValue } from 'clsx';
@@ -39,6 +40,7 @@ export default function Layout({ user }: LayoutProps) {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Cabang', path: '/cabang', icon: Building2, roles: ['admin', 'bendahara'] },
     { name: 'Peserta', path: '/peserta', icon: Users, roles: ['admin', 'bendahara', 'cabang'] },
+    { name: 'Alumni', path: '/alumni', icon: GraduationCap, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Keuangan', path: '/keuangan', icon: Wallet, roles: ['admin', 'bendahara', 'cabang'] },
     { name: 'Tagihan', path: '/tagihan', icon: FileText, roles: ['cabang'] },
     { name: 'Laporan', path: '/laporan', icon: FileText, roles: ['admin'] },

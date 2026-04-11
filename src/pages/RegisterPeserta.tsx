@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate, Link } from 'react-router-dom';
-import { GraduationCap, CheckCircle2, AlertCircle, ArrowLeft, Building2, User, Phone, Upload } from 'lucide-react';
+import { GraduationCap, CheckCircle2, AlertCircle, ArrowLeft, Building2, User, Phone, Upload, CreditCard } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Pengaturan } from '../types';
 
@@ -346,6 +346,29 @@ export default function RegisterPeserta() {
                     </>
                   )}
                 </div>
+
+                {pengaturan?.bankInfo && pengaturan.bankInfo.nomorRekening && (
+                  <div className="p-4 bg-white border border-purple-200 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-purple-700 font-bold text-xs uppercase tracking-wider">
+                      <CreditCard size={14} />
+                      Informasi Rekening Pembayaran
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Bank</p>
+                        <p className="text-sm font-bold text-gray-900">{pengaturan.bankInfo.namaBank}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Nomor Rekening</p>
+                        <p className="text-sm font-bold text-purple-600">{pengaturan.bankInfo.nomorRekening}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Atas Nama</p>
+                        <p className="text-sm font-bold text-gray-900">{pengaturan.bankInfo.namaPemilik}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-purple-200 flex justify-between items-center">
                   <span className="text-sm font-bold text-purple-900">Total Pembayaran</span>

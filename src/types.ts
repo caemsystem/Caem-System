@@ -43,7 +43,7 @@ export interface Peserta {
   nominalPendaftaran?: number;
   buktiBayarUrl?: string;
   statusPembayaran?: 'lunas' | 'belum_lunas';
-  status?: 'pending' | 'aktif' | 'rejected';
+  status?: 'pending' | 'aktif' | 'rejected' | 'alumni';
   createdAt: string;
 }
 
@@ -67,6 +67,12 @@ export interface ItemBiaya {
   nominalPusat: number;
 }
 
+export interface BankInfo {
+  namaBank: string;
+  nomorRekening: string;
+  namaPemilik: string;
+}
+
 export interface Pengaturan {
   biayaPendaftaranCabang: number;
   biayaPendaftaranPeserta: number;
@@ -75,6 +81,7 @@ export interface Pengaturan {
   persentaseMinimalDP?: number;
   rincianBiayaCabang?: ItemBiaya[];
   rincianBiayaPeserta?: ItemBiaya[];
+  bankInfo?: BankInfo;
 }
 
 export interface Tagihan {

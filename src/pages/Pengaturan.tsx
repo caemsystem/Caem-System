@@ -21,7 +21,8 @@ import {
   Mail,
   Lock,
   UserPlus,
-  X
+  X,
+  DollarSign
 } from 'lucide-react';
 
 // Secondary app for creating users without logging out current admin
@@ -48,6 +49,11 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
     persentasePusat: 30,
     persentaseCabang: 70,
     persentaseMinimalDP: 50,
+    bankInfo: {
+      namaBank: '',
+      nomorRekening: '',
+      namaPemilik: ''
+    }
   });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -154,6 +160,7 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
           ...data,
           rincianBiayaCabang: data.rincianBiayaCabang || [],
           rincianBiayaPeserta: data.rincianBiayaPeserta || [],
+          bankInfo: data.bankInfo || { namaBank: '', nomorRekening: '', namaPemilik: '' }
         }));
       }
     } catch (error) {
@@ -446,6 +453,58 @@ export default function PengaturanPage({ user }: PengaturanPageProps) {
                       {(!settings.rincianBiayaPeserta || settings.rincianBiayaPeserta.length === 0) && (
                         <p className="text-xs text-gray-400 italic">Belum ada rincian biaya.</p>
                       )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bank Info Section */}
+                <div className="pt-6 border-t border-gray-100">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl"><DollarSign size={20} /></div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">Informasi Rekening Pembayaran</h4>
+                      <p className="text-xs text-gray-500">Rekening ini akan ditampilkan di halaman pendaftaran.</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Nama Bank</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Bank Mandiri"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                        value={settings.bankInfo?.namaBank || ''}
+                        onChange={e => setSettings({
+                          ...settings,
+                          bankInfo: { ...(settings.bankInfo || { namaBank: '', nomorRekening: '', namaPemilik: '' }), namaBank: e.target.value }
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Nomor Rekening</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: 1234567890"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                        value={settings.bankInfo?.nomorRekening || ''}
+                        onChange={e => setSettings({
+                          ...settings,
+                          bankInfo: { ...(settings.bankInfo || { namaBank: '', nomorRekening: '', namaPemilik: '' }), nomorRekening: e.target.value }
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Nama Pemilik</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: PT CAEM INDONESIA"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                        value={settings.bankInfo?.namaPemilik || ''}
+                        onChange={e => setSettings({
+                          ...settings,
+                          bankInfo: { ...(settings.bankInfo || { namaBank: '', nomorRekening: '', namaPemilik: '' }), namaPemilik: e.target.value }
+                        })}
+                      />
                     </div>
                   </div>
                 </div>

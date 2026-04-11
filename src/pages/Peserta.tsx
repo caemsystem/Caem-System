@@ -1,5 +1,5 @@
 import React, { useEffect, useState, FormEvent } from 'react';
-import { collection, query, getDocs, addDoc, serverTimestamp, where, orderBy, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, where, orderBy, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, Peserta, Cabang, Pengaturan } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firestore-utils';
@@ -14,9 +14,16 @@ import {
   Mail,
   X,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Download,
+  FileText,
+  GraduationCap,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface PesertaPageProps {
   user: UserProfile;
@@ -144,10 +151,79 @@ export default function PesertaPage({ user }: PesertaPageProps) {
     }
   };
 
+  const handleMarkAlumni = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'peserta', id), {
+        status: 'alumni'
+      });
+      setSuccessMessage('Peserta telah ditandai sebagai alumni!');
+      setIsDetailModalOpen(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error marking alumni:', error);
+    }
+  };
+
+  const downloadAttendance = () => {
+    const doc = new jsPDF() as any;
+    const title = `Daftar Hadir Peserta - ${filterCabang === 'all' ? 'Semua Cabang' : (filterCabang === 'pusat' ? 'Pusat' : (cabangList.find(c => c.id === filterCabang)?.namaCabang || 'Cabang'))}`;
+    
+    doc.setFontSize(16);
+    doc.text(title, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
+    
+    const tableData = filteredPeserta.map((p, index) => [
+      index + 1,
+      p.nama,
+      p.cabangId === 'pusat' ? 'Pusat' : (cabangList.find(c => c.id === p.cabangId)?.namaCabang || 'Cabang'),
+      '', // Paraf
+      '', // Keterangan
+    ]);
+
+    autoTable(doc, {
+      startY: 30,
+      head: [['No', 'Nama Peserta', 'Cabang', 'Paraf', 'Keterangan']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+
+    doc.save(`Daftar_Hadir_${new Date().getTime()}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const data = filteredPeserta.map((p, index) => ({
+      'No': index + 1,
+      'Nama Peserta': p.nama,
+      'Alamat': p.dataDiri.alamat || '-',
+      'No. HP': p.dataDiri.noHp || '-',
+      'Email': p.dataDiri.email || '-',
+      'Cabang': p.cabangId === 'pusat' ? 'Pusat' : (cabangList.find(c => c.id === p.cabangId)?.namaCabang || 'Cabang'),
+      'Status': p.status || 'aktif',
+      'Status Pembayaran': p.statusPembayaran === 'lunas' ? 'Lunas' : 'Belum Lunas',
+      'Nominal Pendaftaran': p.nominalPendaftaran || 0,
+      'Tanggal Daftar': p.createdAt ? new Date(p.createdAt).toLocaleDateString('id-ID') : '-'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Peserta');
+    
+    // Auto-size columns
+    const maxWidths = Object.keys(data[0] || {}).map(key => ({
+      wch: Math.max(key.length, ...data.map(row => String((row as any)[key]).length)) + 2
+    }));
+    worksheet['!cols'] = maxWidths;
+
+    XLSX.writeFile(workbook, `Data_Peserta_${new Date().getTime()}.xlsx`);
+  };
+
   const filteredPeserta = pesertaList.filter(p => {
     const matchesSearch = p.nama.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCabang = filterCabang === 'all' || p.cabangId === filterCabang;
-    return matchesSearch && matchesCabang;
+    const isNotAlumni = p.status !== 'alumni';
+    return matchesSearch && matchesCabang && isNotAlumni;
   });
 
   return (
@@ -199,6 +275,22 @@ export default function PesertaPage({ user }: PesertaPageProps) {
           >
             <Plus size={20} />
             Tambah Peserta
+          </button>
+          <button 
+            onClick={downloadAttendance}
+            disabled={filteredPeserta.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-green-200 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <Download size={20} />
+            Daftar Hadir
+          </button>
+          <button 
+            onClick={exportToExcel}
+            disabled={filteredPeserta.length === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <FileSpreadsheet size={20} />
+            Export Excel
           </button>
         </div>
       </div>
@@ -465,6 +557,16 @@ export default function PesertaPage({ user }: PesertaPageProps) {
                       <span className="text-xs text-gray-500">Terdaftar: {new Date(selectedPeserta.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
+
+                  {selectedPeserta.status !== 'alumni' && (
+                    <button
+                      onClick={() => handleMarkAlumni(selectedPeserta.id)}
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2"
+                    >
+                      <GraduationCap size={20} />
+                      Selesai Bimbingan (Alumni)
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>

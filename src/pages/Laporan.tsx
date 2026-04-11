@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 interface LaporanPageProps {
@@ -97,7 +97,7 @@ export default function LaporanPage({ user }: LaporanPageProps) {
       formatCurrency(tx.porsiCabang)
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 30,
       head: [['Tanggal', 'Tipe', 'Cabang', 'Total', 'Pusat', 'Cabang']],
       body: tableData,

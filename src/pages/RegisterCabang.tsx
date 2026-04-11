@@ -3,7 +3,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, getAuth, si
 import { doc, setDoc, addDoc, collection, serverTimestamp, getDoc, getFirestore, getDocs } from 'firebase/firestore';
 import { auth, db, firebaseConfig } from '../firebase';
 import { useNavigate, Link } from 'react-router-dom';
-import { Building2, Upload, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Building2, Upload, CheckCircle2, AlertCircle, ArrowLeft, CreditCard } from 'lucide-react';
 import { motion } from 'motion/react';
 import { initializeApp, getApp, getApps } from 'firebase/app';
 import { Pengaturan } from '../types';
@@ -456,6 +456,29 @@ export default function RegisterCabang() {
                     </>
                   )}
                 </div>
+
+                {pengaturan?.bankInfo && pengaturan.bankInfo.nomorRekening && (
+                  <div className="p-4 bg-white border border-blue-200 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-blue-700 font-bold text-xs uppercase tracking-wider">
+                      <CreditCard size={14} />
+                      Informasi Rekening Pembayaran
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Bank</p>
+                        <p className="text-sm font-bold text-gray-900">{pengaturan.bankInfo.namaBank}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Nomor Rekening</p>
+                        <p className="text-sm font-bold text-blue-600">{pengaturan.bankInfo.nomorRekening}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">Atas Nama</p>
+                        <p className="text-sm font-bold text-gray-900">{pengaturan.bankInfo.namaPemilik}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <button
